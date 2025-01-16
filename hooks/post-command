@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Make sure we clean-up the temporary secrets after the command has run, we don't
+# want to leave these around after we're finished.
+
+set -euo pipefail
+
+DIR="$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
+
+# shellcheck source=lib/plugin.bash
+. "${DIR}/../lib/plugin.bash"
+
+# In `pre-command` a temporary directory was setup that contains some secrets, it
+# should now be removed from the instance.
+if [[ -d "${BUILDKITE_PLUGIN_AWS_SECRETSMANAGER_TO_BAZELRC_TMP_DIR:-}" ]]; then
+  rm -rf "${BUILDKITE_PLUGIN_AWS_SECRETSMANAGER_TO_BAZELRC_TMP_DIR:-}"
+fi

@@ -1,14 +1,21 @@
-name: Buildkite Plugin
-description: Exceptional functionality
+name: AWS SecretsManager to bazelrc file
+description: Take a SecretsManager path and convert the content into a .bazelrc file
 author: https://github.com/buildkite-plugins
+public: true
 requirements:
+  - aws
   - bash
+  - jq
 configuration:
   properties:
-    mandatory:
+    bazel-config:
       type: string
-    optional:
+      default: "buildkite"
+    output-filename:
+      type: string
+      default: ".bazelrc-buildkite"
+    path:
       type: string
   required:
-    - mandatory
+    - path
   additionalProperties: false

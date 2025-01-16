@@ -1,6 +1,6 @@
-# Template Buildkite Plugin [![Build status](https://badge.buildkite.com/d673030645c7f3e7e397affddd97cfe9f93a40547ed17b6dc5.svg)](https://buildkite.com/buildkite/plugins-template)
+# AWS SecretsManager to BazelRC file Buildkite Plugin [![Build status](https://badge.buildkite.com/d673030645c7f3e7e397affddd97cfe9f93a40547ed17b6dc5.svg)](https://buildkite.com/buildkite/aws-secretsmanager-to-bazelrc)
 
-A Buildkite plugin for something awesome
+A Buildkite plugin that will take a JSON blob from an AWS SecretsManager path and hydrate it into Bazel configuration options.
 
 ## Options
 
@@ -8,54 +8,74 @@ These are all the options available to configure this plugin's behaviour.
 
 ### Required
 
-#### `mandatory` (string)
+#### `path` (string)
 
-A great description of what this is supposed to do.
+The path within SecretsManager that the secret can be retrieved from.
 
 ### Optional
 
-#### `optional` (string)
+#### `bazel-config` (string)
 
-Describe how the plugin behaviour changes if this option is not specified, allowed values and its default.
+The name of the config group within Bazel to assign the parameters to. This is the value that will be used in the `--config=` switch when running Bazel.
+
+By default, this value is set to `buildkite`.
+
+#### `output-filename` (string)
+
+The filename of the generated `.bazelrc` configuration. This is the filename that will be referred to when using `--bazelrc=` when running Bazel.
+
+By default, this value is set to `.bazelrc-buildkite`.
 
 ## Examples
 
-Show how your plugin is to be used
+Default usage.
 
 ```yaml
 steps:
   - label: "🔨 Running plugin"
-    command: "echo template plugin"
+    command: "bazelisk build --config=buildkite --bazelrc=.bazelrc --bazelrc=.bazelrc-generated //..."
     plugins:
-      - template#v1.0.0:
-          mandatory: "value"
+      - aws-secretsmanager-to-bazelrc-file#v1.0.0:
+          path: "my/secret/path"
 ```
 
 ## And with other options as well
 
-If you want to change the plugin behaviour:
+With all configuration options included.
 
 ```yaml
 steps:
   - label: "🔨 Running plugin"
-    command: "echo template plugin with options"
+    command: "bazelisk build --config=bk --bazelrc=.bazelrc --bazelrc=other //..."
     plugins:
-      - template#v1.0.0:
-          mandatory: "value"
-          optional: "example"
+      - aws-secretsmanager-to-bazelrc-file#v1.0.0:
+          path: "my/secret/path"
+          bazel-config: "bk"
+          output-filename: "other"
 ```
 
-## ⚒ Developing
+## Combining with other plugins
 
-You can use the [bk cli](https://github.com/buildkite/cli) to run the [pipeline](.buildkite/pipeline.yml) locally:
+This plugin is designed to work with the [aws-assume-role-with-web-identity](https://github.com/buildkite-plugins/aws-assume-role-with-web-identity-buildkite-plugin) plugin to allow for OIDC access to SecretsManager.
 
-```bash
-bk local run
+See the [Buildkite docs](https://buildkite.com/docs/pipelines/security/oidc/aws) for a comprehensive guide on setting up and using OIDC.
+
+```yaml
+steps:
+  - label: "🔨 Running plugin"
+    command: "bazelisk build --config=bk --bazelrc=.bazelrc --bazelrc=other //..."
+    plugins:
+      - aws-assume-role-with-web-identity#v1.1.0:
+          role: "arn:aws:..."
+      - aws-secretsmanager-to-bazelrc-file#v1.0.0:
+          path: "my/secret/path"
+          bazel-config: "bk"
+          output-filename: "other"
 ```
 
 ## 👩‍💻 Contributing
 
-Your policy on how to contribute to the plugin!
+Naturally, PRs are welcomed! The intention here is to ensure a JSON structure of secret content can be safely converted into configuration that allows for proper extended usage of Bazel, especially with services such as remote executors or caches.
 
 ## 📜 License
 

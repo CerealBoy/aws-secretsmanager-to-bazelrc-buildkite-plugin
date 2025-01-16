@@ -1,0 +1,67 @@
+#!/bin/bash
+
+set -euo pipefail
+
+DIR="$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
+
+# shellcheck source=lib/plugin.bash
+. "${DIR}/../lib/plugin.bash"
+
+# We have some parameters to take:
+# Required!
+secrets_path=$(plugin_read_config PATH "")
+if [[ "${secrets_path}" == "" ]]; then
+  echo "Parameter 'path:' is required."
+  exit 1
+fi
+
+# Optional!
+bazel_config=$(plugin_read_config BAZEL_CONFIG "buildkite")
+output_filename=$(plugin_read_config OUTPUT_FILENAME ".bazelrc-buildkite")
+
+echo "Running plugin with options:"
+echo " path: ${secrets_path}"
+echo " bazel-config: ${bazel_config}"
+echo " output-filename: ${output_filename}"
+
+if [[ "${DRY_RUN:-0}" == "1" ]]; then
+  echo "Dry run toggled, exiting."
+  exit 0
+fi
+
+# Put the files into the tmp path
+BUILDKITE_PLUGIN_AWS_SECRETSMANAGER_TO_BAZELRC_TMP_DIR=$(mktemp -d "aws-secretsmanager-to-bazelrc-tmp.XXXXXX")
+export BUILDKITE_PLUGIN_AWS_SECRETSMANAGER_TO_BAZELRC_TMP_DIR
+
+# Args will contain the list of arguments added to the bazel config
+args=()
+
+# Pull the secret, extract the blob from the payload
+aws_secret_json=$(aws secretsmanager get-secret-value --secret-id "${secrets_path}" | jq -r ".SecretString" | jq -rcM)
+
+# For each of the files, hydrate into the file and prep the arg
+blocks=$(echo "${aws_secret_json}" | jq -rcM ".files[]")
+for block in ${blocks}; do
+  filename="$(echo "${block}" | jq -r ".filename")"
+  value="$(echo "${block}" | jq -r ".value")"
+  key="$(echo "${block}" | jq -r ".key")"
+
+  echo -n "${value}" | base64 -d > "${BUILDKITE_PLUGIN_AWS_SECRETSMANAGER_TO_BAZELRC_TMP_DIR}/${filename}"
+
+  args+=("--${key}=${BUILDKITE_PLUGIN_AWS_SECRETSMANAGER_TO_BAZELRC_TMP_DIR}/${filename}")
+done
+
+# For each of the values, prep the arg
+blocks=$(echo "${aws_secret_json}" | jq -rcM ".values[]")
+for block in ${blocks}; do
+  key="$(echo "${block}" | jq -r ".key")"
+  value="$(echo "${block}" | jq -r ".value")"
+
+  args+=("--${key}=${value}")
+done
+
+# Push the args under the config into the .bazelrc for command usage
+touch "${output_filename}"
+echo "build:${bazel_config} ${args[@]}" >> "${output_filename}"
+echo "query:${bazel_config} ${args[@]}" >> "${output_filename}"
+echo "fetch:${bazel_config} ${args[@]}" >> "${output_filename}"
