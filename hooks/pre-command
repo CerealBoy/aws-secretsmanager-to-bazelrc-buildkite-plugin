@@ -25,8 +25,7 @@ echo " bazel-config: ${bazel_config}"
 echo " output-filename: ${output_filename}"
 
 if [[ "${DRY_RUN:-0}" == "1" ]]; then
-  echo "Dry run toggled, exiting."
-  exit 0
+  echo "Dry run active, DRY_RUN_FILE is '${DRY_RUN_FILE:-secretsmanager.json}'."
 fi
 
 # Put the files into the tmp path
@@ -37,7 +36,11 @@ export BUILDKITE_PLUGIN_AWS_SECRETSMANAGER_TO_BAZELRC_TMP_DIR
 args=()
 
 # Pull the secret, extract the blob from the payload
-aws_secret_json=$(aws secretsmanager get-secret-value --secret-id "${secrets_path}" | jq -r ".SecretString" | jq -rcM)
+if [[ "${DRY_RUN:-0}" == "1" ]]; then
+  aws_secret_json=$(cat "${DRY_RUN_FILE:-secretsmanager.json}" | jq -rM)
+else
+  aws_secret_json=$(aws secretsmanager get-secret-value --secret-id "${secrets_path}" | jq -r ".SecretString" | jq -rcM)
+fi
 
 # For each of the files, hydrate into the file and prep the arg
 blocks=$(echo "${aws_secret_json}" | jq -rcM ".files[]")
